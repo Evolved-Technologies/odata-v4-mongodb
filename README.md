@@ -1,8 +1,6 @@
-# OData V4 Service modules - MongoDB Connector [![Build Status](https://travis-ci.org/WandererInVoids/odata-v4-mongodb.svg?branch=master)](https://travis-ci.org/WandererInVoids/odata-v4-mongodb)
+# OData V4 Service modules - MongoDB Connector 
 
-Service OData v4 requests from a MongoDB data store.
-sample project that using mongodb, mongoose and express 
-https://github.com/WandererInVoids/odata-v4-mongodb-sample-express
+Tools to transform OData requests to MQL syntax.
 
 ## Synopsis
 The OData V4 MongoDB Connector provides functionality to convert the various types of OData segments
@@ -11,58 +9,6 @@ into MongoDB query objects, that you can execute over a MongoDB database.
 ## Potential usage scenarios
 
 - Create high speed, standard compliant data sharing APIs
-
-## Usage as server - TypeScript
-```javascript
-import { createFilter } from '@wandererin/odata-v4-mongodb'
-
-//example request:  GET /api/products?$filter=category/id eq 5 or color eq 'Red'
-app.get("/api/products", (req: Request, res: Response) => {
-    const filter = createFilter(req.query.$filter);
-    // collection instance from MongoDB Node.JS Driver
-    collection.find(filter, function(err, data){
-        res.json({
-        	'@odata.context': req.protocol + '://' + req.get('host') + '/api/$metadata#products',
-        	value: data
-        });
-    });
-});
-```
-## Usage with character like / | +?.*? \'
-U need encode string like 
-```javascript 
-let string = "1/2|2+?.*?(.*)/'"
-let val = encodeURIComponent(string) // before
-// in request for value string
-// name eq "val", contains, startswit, endswith, substringof 
-```
-
-
-## Usage ES5
-```javascript
-var createFilter = require('@wandererin/odata-v4-mongodb').createFilter;
-
-app.get("/api/products", function(req, res) {
-    var filter = createFilter(req.query.$filter);
-    // collection instance from MongoDB Node.JS Driver
-    collection.find(filter, function(err, data){
-        res.json({
-        	'@odata.context': req.protocol + '://' + req.get('host') + '/api/$metadata#products',
-        	value: data
-        });
-    });
-})
-```
-## Creates MongoDB collection, query, projection, sort, skip and limit from an OData URI string
-```javascript
-createQuery(odataQuery); // not null or empty
-```
-
-## Creates a MongoDB query object from an OData filter expression string
-```javascript
-createFilter(odataQuery); // not null or empty
-```
-
 
 ## Supported OData segments
 
