@@ -1,24 +1,26 @@
 import * as escapeStringRegexp from "escape-string-regexp";
-import {Token} from "@odata/parser/lib/lexer";
-import {Literal} from "odata-v4-literal";
+import { Token } from "@odata/parser/lib/lexer";
+import { Literal } from "odata-v4-literal";
 
 export class Visitor {
-  query: any
-  sort: any
-  skip: number
-  limit: number
-  projection: any
-  collection: string
-  navigationProperty: string
-  includes: Visitor[]
-  inlinecount: boolean
-  ast: Token
+  query: any;
+  sort: any;
+  skip: number;
+  limit: number;
+  projection: any;
+  collection: string;
+  navigationProperty: string;
+  includes: Visitor[];
+  inlinecount: boolean;
+  ast: Token;
+  aggregationStages: any[];
 
   constructor() {
     this.query = {};
     this.sort = {};
     this.projection = {};
     this.includes = [];
+    this.aggregationStages = [];
 
     let _ast;
     Object.defineProperty(this, "ast", {
@@ -28,7 +30,7 @@ export class Visitor {
       set: (v) => {
         _ast = v;
       },
-      enumerable: false
+      enumerable: false,
     });
   }
 
@@ -57,7 +59,9 @@ export class Visitor {
     var innerContexts: any = {};
     node.value.items.forEach((item) => {
       var expandPath = item.value.path.raw;
-      var innerVisitor = this.includes.filter(v => v.navigationProperty === expandPath)[0];
+      var innerVisitor = this.includes.filter(
+        (v) => v.navigationProperty === expandPath
+      )[0];
       if (!innerVisitor) {
         innerVisitor = new Visitor();
 
@@ -65,7 +69,7 @@ export class Visitor {
           query: {},
           sort: {},
           projection: {},
-          options: {}
+          options: {},
         };
 
         this.includes.push(innerVisitor);
@@ -74,15 +78,33 @@ export class Visitor {
       let innerContext: any = innerContexts[expandPath] || {};
       innerVisitor.Visit(item, innerContext);
 
+      const lookupStage = {
+        $lookup: {
+          from: expandPath, // The collection to join
+          localField: "_id", // Replace with the actual local join field
+          foreignField: "todoId", // Replace with the actual foreign join field
+          as: expandPath, // The alias for the joined data
+        },
+      };
+
+      // Add the $lookup stage to the aggregation pipeline
+      this.aggregationStages.push(lookupStage);
+
+      // Optionally, handle nested $expand within this $expand
+      // This requires recursive handling of expansions
+      this.aggregationStages.push(...innerVisitor.aggregationStages);
+
       innerVisitor.query = innerContext.query || innerVisitor.query || {};
       innerVisitor.sort = innerContext.sort || innerVisitor.sort;
-      innerVisitor.projection = innerContext.projection || innerVisitor.projection;
+      innerVisitor.projection =
+        innerContext.projection || innerVisitor.projection;
     });
   }
 
   protected VisitExpandItem(node: Token, context: any) {
     this.Visit(node.value.path, context);
-    node.value.options && node.value.options.forEach((item) => this.Visit(item, context));
+    node.value.options &&
+      node.value.options.forEach((item) => this.Visit(item, context));
   }
 
   protected VisitExpandPath(node: Token, context: any) {
@@ -128,7 +150,8 @@ export class Visitor {
 
   protected VisitOrderByItem(node: Token, context: any) {
     this.Visit(node.value.expr, context);
-    if (context.identifier) context.sort[context.identifier] = node.value.direction;
+    if (context.identifier)
+      context.sort[context.identifier] = node.value.direction;
     delete context.identifier;
     delete context.literal;
   }
@@ -142,7 +165,7 @@ export class Visitor {
   }
 
   protected VisitSelectItem(node: Token, context: any) {
-    context.projection[node.raw.replace(/\//g, '.')] = 1;
+    context.projection[node.raw.replace(/\//g, ".")] = 1;
   }
 
   protected VisitAndExpression(node: Token, context: any) {
@@ -155,7 +178,10 @@ export class Visitor {
     context.query = rightQuery;
     this.Visit(node.value.right, context);
 
-    if (Object.keys(leftQuery).length > 0 && Object.keys(rightQuery).length > 0) {
+    if (
+      Object.keys(leftQuery).length > 0 &&
+      Object.keys(rightQuery).length > 0
+    ) {
       query.$and = [leftQuery, rightQuery];
     }
     context.query = query;
@@ -171,7 +197,10 @@ export class Visitor {
     context.query = rightQuery;
     this.Visit(node.value.right, context);
 
-    if (Object.keys(leftQuery).length > 0 && Object.keys(rightQuery).length > 0) {
+    if (
+      Object.keys(leftQuery).length > 0 &&
+      Object.keys(rightQuery).length > 0
+    ) {
       query.$or = [leftQuery, rightQuery];
     }
     context.query = query;
@@ -216,7 +245,7 @@ export class Visitor {
     this.Visit(node.value, context);
     if (context.query) {
       for (var prop in context.query) {
-        context.query[prop] = {$not: context.query[prop]};
+        context.query[prop] = { $not: context.query[prop] };
       }
     }
   }
@@ -225,7 +254,8 @@ export class Visitor {
     this.Visit(node.value.left, context);
     this.Visit(node.value.right, context);
 
-    if (context.identifier) context.query[context.identifier] = {$eq: context.literal};
+    if (context.identifier)
+      context.query[context.identifier] = { $eq: context.literal };
 
     delete context.identifier;
     delete context.literal;
@@ -235,7 +265,8 @@ export class Visitor {
     var left = this.Visit(node.value.left, context);
     var right = this.Visit(node.value.right, context);
 
-    if (context.identifier) context.query[context.identifier] = {$ne: context.literal};
+    if (context.identifier)
+      context.query[context.identifier] = { $ne: context.literal };
     delete context.identifier;
     delete context.literal;
   }
@@ -244,7 +275,8 @@ export class Visitor {
     var left = this.Visit(node.value.left, context);
     var right = this.Visit(node.value.right, context);
 
-    if (context.identifier) context.query[context.identifier] = {$lt: context.literal};
+    if (context.identifier)
+      context.query[context.identifier] = { $lt: context.literal };
     delete context.identifier;
     delete context.literal;
   }
@@ -253,7 +285,8 @@ export class Visitor {
     var left = this.Visit(node.value.left, context);
     var right = this.Visit(node.value.right, context);
 
-    if (context.identifier) context.query[context.identifier] = {$lte: context.literal};
+    if (context.identifier)
+      context.query[context.identifier] = { $lte: context.literal };
     delete context.identifier;
     delete context.literal;
   }
@@ -262,7 +295,8 @@ export class Visitor {
     var left = this.Visit(node.value.left, context);
     var right = this.Visit(node.value.right, context);
 
-    if (context.identifier) context.query[context.identifier] = {$gt: context.literal};
+    if (context.identifier)
+      context.query[context.identifier] = { $gt: context.literal };
     delete context.identifier;
     delete context.literal;
   }
@@ -271,7 +305,8 @@ export class Visitor {
     var left = this.Visit(node.value.left, context);
     var right = this.Visit(node.value.right, context);
 
-    if (context.identifier) context.query[context.identifier] = {$gte: context.literal};
+    if (context.identifier)
+      context.query[context.identifier] = { $gte: context.literal };
     delete context.identifier;
     delete context.literal;
   }
@@ -282,26 +317,76 @@ export class Visitor {
 
   protected VisitMethodCallExpression(node: Token, context: any) {
     var method = node.value.method;
-    var params = (node.value.parameters || []).forEach(p => this.Visit(p, context));
+    var params = (node.value.parameters || []).forEach((p) =>
+      this.Visit(p, context)
+    );
     if (context.identifier) {
       switch (method) {
         case "substringof":
-          context.query[context.identifier] = new RegExp(escapeStringRegexp(context.literal), "gi");
+          context.query[context.identifier] = new RegExp(
+            escapeStringRegexp(context.literal),
+            "gi"
+          );
           break;
         case "contains":
-          context.query[context.identifier] = new RegExp(escapeStringRegexp(context.literal), "gi");
+          context.query[context.identifier] = new RegExp(
+            escapeStringRegexp(context.literal),
+            "gi"
+          );
           break;
         case "endswith":
-          context.query[context.identifier] = new RegExp(escapeStringRegexp(context.literal) + "$", "gi");
+          context.query[context.identifier] = new RegExp(
+            escapeStringRegexp(context.literal) + "$",
+            "gi"
+          );
           break;
         case "startswith":
-          context.query[context.identifier] = new RegExp("^" + escapeStringRegexp(context.literal), "gi");
+          context.query[context.identifier] = new RegExp(
+            "^" + escapeStringRegexp(context.literal),
+            "gi"
+          );
           break;
         default:
-          throw new Error("Method call not implemented.")
+          throw new Error("Method call not implemented.");
       }
       delete context.identifier;
     }
   }
 
+  GenerateMongoQuery() {
+    const aggregationPipeline = [];
+
+    // $match stage
+    if (Object.keys(this.query).length > 0) {
+      aggregationPipeline.push({ $match: this.query });
+    }
+
+    // $sort stage
+    if (Object.keys(this.sort).length > 0) {
+      aggregationPipeline.push({ $sort: this.sort });
+    }
+
+    // $skip stage
+    if (typeof this.skip === "number") {
+      aggregationPipeline.push({ $skip: this.skip });
+    }
+
+    // $limit stage
+    if (typeof this.limit === "number") {
+      aggregationPipeline.push({ $limit: this.limit });
+    }
+
+    // $project stage
+    if (Object.keys(this.projection).length > 0) {
+      aggregationPipeline.push({ $project: this.projection });
+    }
+
+    // $lookup stages (expansions)
+    if (this.aggregationStages.length > 0) {
+      aggregationPipeline.push(...this.aggregationStages);
+    }
+
+    // Return the constructed aggregation pipeline
+    return aggregationPipeline;
+  }
 }
